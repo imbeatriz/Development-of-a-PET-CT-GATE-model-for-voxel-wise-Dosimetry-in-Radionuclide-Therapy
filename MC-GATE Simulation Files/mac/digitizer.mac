@@ -1,0 +1,89 @@
+#==============================================================
+# DIGITIZER: DETECTOR ELECTRONIC RESPONSE - DPC PHOTODETECTOR
+#==============================================================
+
+# PET SCANNER'S DATA PROCESSING PARAMETERS
+# Defined according to the "Monte Carlo simulation of digital photon counting PET" article
+
+# ADDER
+
+/gate/digitizer/Singles/insert adder
+
+# READOUT
+ 
+/gate/digitizer/Singles/insert                        readout
+/gate/digitizer/Singles/readout/setDepth              1
+
+# BACKGROUND NOISE
+
+/gate/distributions/name energy_distrib
+/gate/distributions/insert Gaussian
+/gate/distributions/energy_distrib/setMean 511 keV 
+/gate/distributions/energy_distrib/setSigma 1 keV 
+
+/gate/distributions/name dt_distrib 
+/gate/distributions/insert Exponential 
+/gate/distributions/dt_distrib/setLambda 2.17 us
+
+/gate/digitizer/Singles/insert noise 
+/gate/digitizer/Singles/noise/setDeltaTDistribution dt_distrib 
+/gate/digitizer/Singles/noise/setEnergyDistribution energy_distrib
+
+# ENERGY  BLURRING
+
+/gate/digitizer/Singles/insert crystalblurring 
+/gate/digitizer/Singles/crystalblurring/setCrystalResolutionMin 0.112
+/gate/digitizer/Singles/crystalblurring/setCrystalResolutionMax 0.112
+/gate/digitizer/Singles/crystalblurring/setCrystalQE 0.865   # Detection efficiency
+/gate/digitizer/Singles/crystalblurring/setCrystalEnergyOfReference 511. keV
+
+# SINGLES TIMING RESOLUTION
+
+/gate/digitizer/Singles/insert timeResolution 
+/gate/digitizer/Singles/timeResolution/setTimeResolution 220 ps
+/gate/digitizer/Singles/timeResolution/verbose 0
+
+# PILE-UP
+
+/gate/digitizer/Singles/insert pileup
+/gate/digitizer/Singles/pileup/setDepth 1 
+/gate/digitizer/Singles/pileup/setPileup 5.9 ns
+
+# DEADTIME
+
+/gate/digitizer/Singles/insert deadtime
+/gate/digitizer/Singles/deadtime/setDeadTime 5.9 ns
+/gate/digitizer/Singles/deadtime/setMode paralysable
+/gate/digitizer/Singles/deadtime/chooseDTVolume module
+
+# ENERGY  WINDOW
+
+# HIGH ENERGY CUT  
+/gate/digitizer/Singles/insert thresholder  
+/gate/digitizer/Singles/thresholder/setThreshold 449.68 keV
+/gate/digitizer/Singles/insert upholder  
+/gate/digitizer/Singles/upholder/setUphold 613.20 keV
+
+# PROMPT / COINCIDENCES WINDOW
+
+/gate/digitizer/Coincidences/setInputName Singles 
+/gate/digitizer/Coincidences/setOffset 0. ns
+/gate/digitizer/Coincidences/setWindow 2.0115 ns
+/gate/digitizer/Coincidences/minSectorDifference 5
+/gate/digitizer/Coincidences/MultiplesPolicy takeAllGoods
+
+## second method for coincidence sorting
+/gate/digitizer/Coincidences/allPulseOpenCoincGate true
+
+# DELAY WINDOW
+
+/gate/digitizer/name   Delay
+/gate/digitizer/insert   coincidenceSorter
+/gate/digitizer/Delay/setInputName   Singles
+/gate/digitizer/Delay/setOffset   100 ns
+/gate/digitizer/Delay/setWindow   2.0115 ns
+/gate/digitizer/Delay/minSectorDifference 5
+/gate/digitizer/Delay/MultiplesPolicy takeAllGoods
+
+## second method for coincidence sorting
+/gate/digitizer/Delay/allPulseOpenCoincGate true
