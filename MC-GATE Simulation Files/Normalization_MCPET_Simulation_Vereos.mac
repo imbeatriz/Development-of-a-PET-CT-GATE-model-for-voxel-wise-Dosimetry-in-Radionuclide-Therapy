@@ -1,0 +1,206 @@
+# ----------------------------------------------------------
+# Philips Vereos PET/CT Scanner Normalization Simulation
+# ----------------------------------------------------------
+
+#=====================================================
+# VERBOSITY
+#=====================================================
+
+/control/execute mac/verbose.mac
+
+#=====================================================
+# VISUALIZATION
+#=====================================================
+
+/vis/disable
+#/control/execute mac/visu.mac # activate for visualization, need to comment the /vis/disable
+
+#=====================================================
+# PET SCANNER GEOMETRY
+#=====================================================
+
+/gate/geometry/setMaterialDatabase data/GateMaterials.db
+
+/control/execute mac/pet_geometry.mac
+
+#=====================================================
+# DIGITIZER : DETECTOR ELECTRONIC RESPONSE
+#=====================================================
+
+/control/execute mac/digitizer.mac
+
+#=====================================================
+# NORMALIZATION PHANTOM
+#=====================================================
+
+# Cylinder covering all LORs
+
+# Cylinder Definition
+/gate/world/daughters/name               phantom
+/gate/world/daughters/insert             cylinder
+/gate/phantom/placement/setTranslation   0.0 0.0 0.0 cm
+/gate/phantom/geometry/setRmax           350 mm
+/gate/phantom/geometry/setRmin           349 mm
+/gate/phantom/geometry/setHeight         180 mm
+/gate/phantom/setMaterial                G4_POLYETHYLENE
+/gate/phantom/vis/forceWireframe
+/gate/phantom/vis/setColor               black
+/gate/phantom/vis/setVisible             
+
+# Interior Cylinder filled with water
+/gate/phantom/daughters/name               SourceIn
+/gate/phantom/daughters/insert             cylinder
+/gate/SourceIn/placement/setTranslation   0.0 0.0 0.0 cm
+/gate/SourceIn/geometry/setRmin           348 mm
+/gate/SourceIn/geometry/setRmax           349 mm
+/gate/SourceIn/geometry/setHeight         179 mm
+/gate/SourceIn/setMaterial                G4_WATER
+/gate/SourceIn/vis/forceSolid
+/gate/SourceIn/vis/setColor               cyan
+/gate/SourceIn/vis/setVisible             1
+
+/gate/phantom/attachPhantomSD
+/gate/SourceIn/attachPhantomSD
+
+#=====================================================
+# PHYSICS
+#=====================================================
+
+# Geant4 physics list selected
+/gate/physics/addPhysicsList emstandard_opt3
+
+# Cuts in world
+/gate/physics/Gamma/SetCutInRegion     world        5.0 mm
+/gate/physics/Electron/SetCutInRegion  world        5.0 mm
+/gate/physics/Positron/SetCutInRegion  world        5.0 mm
+
+# Cuts in cylindrical phantom - moderate cuts
+/gate/physics/Gamma/SetCutInRegion      phantom  1 mm
+/gate/physics/Electron/SetCutInRegion   phantom  1 mm
+/gate/physics/Positron/SetCutInRegion   phantom  1 mm
+
+# LYSO crystal — very fine for energy deposition accuracy
+/gate/physics/Gamma/SetCutInRegion     crystal      0.1 mm
+/gate/physics/Electron/SetCutInRegion  crystal      0.01 mm
+/gate/physics/Positron/SetCutInRegion  crystal      0.01 mm
+
+# Initiate Physics 
+/gate/physics/processList Enabled
+
+#=====================================================
+# ACTORS FOR STATISTICS - INFO ABOUT SIMULATION
+#=====================================================
+
+/gate/actor/addActor               SimulationStatisticActor stat
+/gate/actor/stat/save              Output_PET_Normalization/stats_PET.txt
+/gate/actor/stat/saveEveryNSeconds 60
+
+#=====================================================
+# ACTORS FOR ATTENUATION MAP
+#=====================================================
+
+/gate/actor/addActor MuMapActor getMuMap
+/gate/actor/getMuMap/attachTo phantom
+/gate/actor/getMuMap/save Output_PET_Normalization/AttenuationNormalization_Image.mhd
+/gate/actor/getMuMap/setPosition 0 0 0 mm
+/gate/actor/getMuMap/setVoxelSize 2.21 2.21 2.21 mm
+/gate/actor/getMuMap/setResolution 125 122 93
+/gate/actor/getMuMap/setEnergy 511 keV
+
+#=====================================================
+# OUTPUTS
+#=====================================================
+
+# Define a PET ROOT list-mode file output
+
+/gate/output/root/enable
+/gate/output/root/setFileName             Output_PET_Normalization/PETVereoslistmode_Normalization
+
+/gate/output/root/setRootHitFlag          0
+/gate/output/root/setRootSinglesFlag      0
+/gate/output/root/setRootCoincidencesFlag 1
+/gate/output/root/setRootDelayFlag        1
+/gate/output/root/setRootNtupleFlag       0
+
+# Summary events output 
+/gate/output/summary/enable
+/gate/output/summary/setFileName   Output_PET_Normalization/events_summaryPETVereos_Normalization.txt
+/gate/output/summary/addCollection Singles
+/gate/output/summary/addCollection Coincidences
+/gate/output/summary/addCollection Delay
+
+
+#=====================================================
+# INITIALISATION OF SIMULATION
+#=====================================================
+
+/gate/run/initialize
+
+/gate/physics/processList Initialized
+
+/gate/physics/displayCuts
+
+#=====================================================
+#  NORMALIZATION SOURCE
+#=====================================================
+
+# Cylinder Source to match normalization phantom
+/gate/source/addSource                         F18Source
+/gate/source/F18Source/gps/pos/type            Volume
+/gate/source/F18Source/gps/pos/shape           Cylinder
+/gate/source/F18Source/gps/pos/radius          349 mm
+/gate/source/F18Source/gps/pos/halfz           179 mm
+/gate/source/F18Source/gps/pos/centre          0.0 0.0 0.0 cm
+/gate/source/F18Source/setActivity             10 MBq
+
+# Attach to normalization phantom
+/gate/source/F18Source/attachTo phantom
+
+#####################################################################################
+### F-18 FDG backtoback Definition from Geant4
+#####################################################################################
+
+# Backtoback emitts pair of photons at 180 degrees relative to each other 
+# Modeling only the emission of a 511 keV photon pair (ignoring positron transport and detailed annihilation physics) simplifies computation - widely accepted by the scientific community
+
+/gate/source/F18Source/setType backtoback
+/gate/source/F18Source/gps/particle gamma
+/gate/source/F18Source/setForcedUnstableFlag true
+# Half life is 109.77 min of F-18
+/gate/source/F18Source/setForcedHalfLife 6586.2 s
+/gate/source/F18Source/gps/ene/type Mono
+/gate/source/F18Source/gps/ene/mono 511.0 keV
+/gate/source/F18Source/gps/pos/confine NULL
+/gate/source/F18Source/gps/ang/type iso
+
+/gate/source/F18Source/dump 1
+/gate/source/list
+
+#====================================================
+# RANDOM ENGINE AND SEED
+#====================================================
+
+# JamesRandom Ranlux64 MersenneTwister Options
+/gate/random/setEngineName MersenneTwister
+/gate/random/setEngineSeed auto
+/gate/random/verbose 1
+
+#=====================================================
+# ACQUISITION SETTINGS   
+#=====================================================
+
+# Limit on the total number of primary particles to reduce simulation computational time
+/gate/application/setTotalNumberOfPrimaries 1e8
+
+#/gate/application/setTotalNumberOfPrimaries 10  # activate only for visualization
+
+# Set PET acquisition times
+#/gate/application/setTimeSlice 30 s
+#/gate/application/setTimeStart 0 s
+#/gate/application/setTimeStop  120 s
+
+#=====================================================
+# RUN SIMULATION
+#=====================================================
+
+/gate/application/startDAQ
